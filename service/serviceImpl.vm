@@ -1,0 +1,203 @@
+#parse("/include/packages_variables.vm")
+#parse("/include/init_var_entity.vm")
+#parse("/include/java_header.vm")
+
+#set( $uncapitalizedEntityName = $fn.uncapitalize($entity.name) )
+#set( $serviceName = "${entity.name}Service"	)
+#set( $dtoSearchName = "${entity.name}SearchDto"	)
+#set( $serviceImplName = "${entity.name}ServiceImpl"	)
+#set( $repositoryName = "${entity.name}Repository"	)
+#set( $enumSearchName = "${entity.name}SearchEnum"	)
+#set( $enumExportName = "${entity.name}ExportEnum"	)
+#set( $searchResultDtoName = "${entity.name}SearchResultDto")
+#set( $editDtoName = "${entity.name}EditDto")
+#set( $uncapitalizedRepoName = $fn.uncapitalize($repositoryName) )
+
+#set( $dataFields = $entity.getAttributesByCriteria( $const.NOT_KEY, $const.NOT_IN_SELECTED_LINKS ) )
+package ${target.javaPackageFromFolder($SRC)};
+
+import vn.com.unit.jcanary.constant.CommonConstant;
+import java.util.Locale;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import javax.servlet.http.HttpServletResponse;
+import java.util.Date;
+import java.util.ArrayList;
+import java.util.List;
+import vn.com.unit.exception.BusinessException;
+import vn.com.unit.jcanary.authentication.UserProfileUtils;
+import vn.com.unit.jcanary.common.PageWrapper;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import vn.com.unit.jcanary.config.SystemConfig;
+import vn.com.unit.jcanary.utils.ExportExcelUtil;
+import vn.com.unit.jcanary.utils.ImportExcelUtil;
+import vn.com.unit.dto.ItemColsExcelDto;
+import javax.servlet.ServletContext;
+import jp.sf.amateras.mirage.SqlManager;
+import vn.com.unit.ep2p.dto.TransferDataImportParam;
+import vn.com.unit.ep2p.constant.ExcelConst;
+
+//--- Entities
+import ${entityPackage}.${entity.name};
+
+//--- Service 
+import ${servicePackage}.${serviceName};
+
+//-- DTO
+import ${dtoPackage}.${dtoSearchName};
+import ${dtoPackage}.${searchResultDtoName};
+import ${dtoPackage}.${editDtoName};
+
+//-- Repository
+import ${entityRepository}.${repositoryName};
+
+//-- Enum Search
+import ${enumPackage}.${enumExportName};
+
+/**
+ * Spring MVC ServiceImpl for '${entity.name}' management.
+ */
+
+@Service
+@Transactional(readOnly = true, rollbackFor = Exception.class)
+public class ${serviceImplName} implements ${serviceName}{
+
+	@Autowired
+    private ${repositoryName} ${uncapitalizedRepoName};
+    
+    @Autowired
+    private SystemConfig systemConfig;
+
+	@Autowired
+	private ServletContext servletContext;
+
+	private static final Logger logger = LoggerFactory.getLogger(${serviceImplName}.class);	
+
+	/**
+	 * Shows a list with all the occurrences of ${entity.name} found in the database
+	 * @param model Spring MVC model
+	 * @return
+	 */
+
+	@Override
+    public PageWrapper<${searchResultDtoName}> doSearch(int page, ${dtoSearchName} searchDto, int pageSize) {
+
+        PageWrapper<${searchResultDtoName}> pageWrapper = new PageWrapper<${searchResultDtoName}>();
+
+		int sizeOfPage = systemConfig.settingPageSizeList(pageSize, pageWrapper, page);
+
+        int count = ${uncapitalizedRepoName}.count${searchResultDtoName}ByCondition(searchDto);
+
+        List<${searchResultDtoName}> result = new ArrayList<${searchResultDtoName}>();
+
+        if (count > 0) {
+            int currentPage = pageWrapper.getCurrentPage();
+            int startIndex = (currentPage - 1) * sizeOfPage;
+            result = ${uncapitalizedRepoName}.findAll${searchResultDtoName}ByCondition(startIndex, sizeOfPage, searchDto);
+        }
+
+        pageWrapper.setDataAndCount(result, count);
+
+        return pageWrapper;
+    }
+
+	@Override
+	public ${editDtoName} get${editDtoName}ById(Long id, Locale locale){
+		${editDtoName} editDto = new ${editDtoName}();
+
+        if(null != id) {
+        	editDto = ${uncapitalizedRepoName}.find${editDtoName}ById(id, locale.toString());
+        }
+
+        return editDto;
+	}
+
+	@Override
+	@Transactional(readOnly = true, rollbackFor = Exception.class)
+	public void saveOrUpdate(${editDtoName} editDto){
+		String userNameLogin = UserProfileUtils.getUserNameLogin();
+
+        Long id = editDto.getId().longValue();
+		
+		${entity.name} entity = new ${entity.name}();
+        
+		if(null != id) {
+			//update data
+        	entity = ${uncapitalizedRepoName}.findOne(id);
+            
+			if(null == entity) {
+                throw new BusinessException( "Not found ${editDtoName} by id= " + id);
+            }
+
+            entity.setUpdatedBy(userNameLogin);
+            entity.setUpdatedDate(new Date());
+
+        }else{
+			//create data
+        	entity.setCreatedBy(userNameLogin);
+        	entity.setCreatedDate(new Date());
+        }
+
+		updateData(entity, editDto);
+
+		${uncapitalizedRepoName}.save(entity);
+	}
+
+	@Override
+	@Transactional(readOnly = true, rollbackFor = Exception.class)
+	public void deleteItem(Long id){
+		String usernameLogin = UserProfileUtils.getUserNameLogin();
+		Date systemDate = new Date();
+		if(null != id) {
+			${entity.name} entity = ${uncapitalizedRepoName}.findOne(id);
+			entity.setDeletedDate(systemDate);
+			entity.setDeletedBy(usernameLogin);
+			entity.setDeleteFlag(1);
+
+			${uncapitalizedRepoName}.save(entity);
+		}
+	}
+
+	@Override
+    public void exportExcel(${dtoSearchName} searchDto, HttpServletResponse res, Locale locale) {
+        try {
+			/*change template*/
+            String templateName = ExcelConst.TEMPLATE_EXPORT_INIT;
+            String template = servletContext.getRealPath(CommonConstant.REAL_PATH_TEMPLATE_EXCEL) + "/" + templateName
+                    + CommonConstant.TYPE_EXCEL;
+
+            String datePattern = systemConfig.getConfig(SystemConfig.DATE_PATTERN);
+
+            List<${editDtoName}> lstData = ${uncapitalizedRepoName}.exportExcelWithCondition(searchDto);
+            List<ItemColsExcelDto> cols = new ArrayList<>();
+
+            // start fill data to workbook
+            ImportExcelUtil.setListColumnExcel(${enumExportName}.class, cols);
+            ExportExcelUtil<${editDtoName}> exportExcel = new ExportExcelUtil<>();
+
+            // do export
+            exportExcel.exportExcelWithXSSFNonPass(template, locale, lstData, ${editDtoName}.class, cols, datePattern, res, templateName);
+
+        } catch (Exception e) {
+           logger.error("exportExcel", e.getMessage());
+        }
+    }
+
+	@Override
+	public List<${editDtoName}> getAll${editDtoName}(){
+		return ${uncapitalizedRepoName}.findAll${editDtoName}();
+	}
+
+	//only update field want to update 
+	public void updateData(${entity.name} source, ${editDtoName} target){
+#foreach( $field in $dataFields )
+#if($field.formattedName(0) != 'deletedBy' && $field.formattedName(0) != 'deletedDate' && $field.formattedName(0) != 'createdBy'
+&& $field.formattedName(0) != 'createdDate' && $field.formattedName(0) != 'updatedDate' && $field.formattedName(0) != 'updatedBy'
+&& $field.formattedName(0) != 'deleteFlag' && $field.formattedName(0) != 'companyCode')
+		source.${field.setter}(target.${field.getter}());
+#end
+#end
+	}
+}

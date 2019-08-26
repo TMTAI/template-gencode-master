@@ -1,0 +1,73 @@
+#parse("/include/packages_variables.vm")
+#parse("/include/init_var_entity.vm")
+#parse("/include/java_header.vm")
+
+#set( $repositoryName = "${entity.name}Repository" )
+#set( $dtoSearchName = "${entity.name}SearchDto" )
+#set( $searchResultDtoName = "${entity.name}SearchResultDto")
+#set( $editDtoName = "${entity.name}EditDto")
+#set( $uncapitalizedEntityName = $fn.uncapitalize($entity.name) )
+package ${target.javaPackageFromFolder($SRC)};
+
+//-- DTO
+import ${dtoPackage}.${dtoSearchName};
+import ${dtoPackage}.${searchResultDtoName};
+import ${dtoPackage}.${editDtoName};
+
+//-- Entity
+import ${entityPackage}.${entity.name};
+
+import java.util.List;
+import org.springframework.data.mirage.repository.MirageRepository;
+import org.springframework.data.repository.query.Param;
+
+public interface ${repositoryName} extends MirageRepository<${entity.name}, Long> {
+
+	/**
+     * findAll${searchResultDtoName}ByCondition
+     *
+     * @param offset
+     * @param sizeOfPage
+     * @param searchDto
+     * @return
+     * @author taitm
+     */
+    public List<${searchResultDtoName}> findAll${searchResultDtoName}ByCondition(
+            @Param("offset") int offset,
+            @Param("sizeOfPage") int sizeOfPage, 
+            @Param("searchDto") ${dtoSearchName} searchDto);
+
+	/**
+     * count${searchResultDtoName}ByCondition
+     *
+     * @param searchDto
+     * @return
+     * @author taitm
+     */
+    public int count${searchResultDtoName}ByCondition(@Param("searchDto")${dtoSearchName} searchDto);
+
+	/**
+     * find${editDtoName}ById
+     *
+     * @param searchDto
+     * @return
+     * @author taitm
+     */
+    public ${editDtoName} find${editDtoName}ById(@Param("id") Long id, @Param("language") String language);
+
+	/**
+     * exportExcelWithCondition
+     *
+     * @param searchDto
+     * @return
+     * @author taitm
+     */
+	public List<${editDtoName}> exportExcelWithCondition(@Param("searchDto") ${dtoSearchName} searchDto);
+
+	/**
+     * findAll${editDtoName}
+     * @return
+     * @author taitm
+     */
+	public List<${editDtoName}> findAll${editDtoName}();
+}

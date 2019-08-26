@@ -1,0 +1,142 @@
+#set( $nameLC = ${entity.name.toLowerCase()} )
+#set( $dataFields = $entity.getAttributesByCriteria( $const.NOT_KEY, $const.NOT_IN_SELECTED_LINKS) )
+#set( $countField = 1)
+#set( $sizeList = $fn.size($dataFields) - 8)
+${DOLLAR}(function(){
+	${DOLLAR}('select[multiple]').multiselect({
+		columns: 1,
+		placeholder: SEARCH_LABEL,
+		search: true
+	});
+	
+	// datatable load
+	${DOLLAR}("#tableList").datatables({
+		url : BASE_URL + '${nameLC}/ajaxList',
+		type : 'POST',
+		setData : setConditionSearch
+	});
+	
+	// on click search
+	${DOLLAR}("#btnSearch").on('click', function(event) {
+		onClickSearch(this, event);
+	});
+
+	// on click edit
+	${DOLLAR}(".j-btn-edit").on("click", function(event) {
+		editItem(this, event);
+	});
+	
+	// on click delete
+	${DOLLAR}(".j-btn-delete").on("click", function( event ) {
+		deleteItem(this, event);
+	});
+
+	// on click add
+	${DOLLAR}("#add").on("click", function(event) {
+		var url = BASE_URL + "${nameLC}/edit";
+		// Redirect to page add
+		ajaxRedirect(url);
+	});
+
+	// on click detail
+	${DOLLAR}(".j-btn-detail").on("click", function(event) {
+		detailItem(this, event);
+	});
+
+	${DOLLAR}('#btnExport').click(function() {
+		var linkExport = BASE_URL + "${nameLC}/export-excel";
+		doExportExcel(linkExport);
+	});
+})
+
+function initData(){
+	// init date picker
+	${DOLLAR}('.date').datepicker({
+		format: 'dd/mm/yyyy',
+		viewMode : "days",
+		minViewMode : "days",
+		autoclose : true,
+		language : '${DOLLAR}{sessionScope.localeSelect}',
+		todayHighlight : true,
+		onRender : function(date) {
+		}
+	});
+
+	var idEffectedDate = ${DOLLAR}("#dateFrom").val();
+	var idExpiredDate = ${DOLLAR}("#dateTo").val();
+	changeDatepickerById(idEffectedDate, idExpiredDate, '#dateFrom', '#dateTo');
+}
+
+function setConditionSearchField() {
+	var condition = {};
+	condition["fieldSearch"] = ${DOLLAR}("#fieldSearchHidden").val();
+	condition["fieldValues"] = ${DOLLAR}("#fieldValuesHidden").val();
+	condition["dateFrom"] = ${DOLLAR}("#dateFrom").val();
+	condition["dateTo"] = ${DOLLAR}("#dateTo").val();
+	return condition;
+}
+
+function setConditionSearch(){
+	var condition = {};
+#foreach($field in $dataFields)
+#if($field.formattedName(0) != 'deletedBy' && $field.formattedName(0) != 'deletedDate' && $field.formattedName(0) != 'createdBy'
+&& $field.formattedName(0) != 'createdDate' && $field.formattedName(0) != 'updatedDate' && $field.formattedName(0) != 'updatedBy'
+&& $field.formattedName(0) != 'deleteFlag' && $field.formattedName(0) != 'companyCode')
+#if($countField <= $sizeList)
+	condition["$field.formattedName(0)"] = ${DOLLAR}("#$field.formattedName(0)").val();
+#end
+#set($countField = $countField  + 1)
+#end
+#end
+	return condition;
+}
+
+function onClickSearch(element, event) {
+	ajaxSearch("${nameLC}/ajaxList", setConditionSearch(), "tableList", element, event);
+}
+
+function editItem(element, event) {
+	event.preventDefault();
+
+	// Prepare data
+	var row = ${DOLLAR}(element).parents("tr");
+	var id = row.data("id");
+	var url = BASE_URL + "${nameLC}/edit?id=" + id;
+
+	// Redirect to page detail
+	ajaxRedirect(url);
+}
+
+function deleteItem(element, event){
+	event.preventDefault();
+	
+	// Prepare data
+	var row = ${DOLLAR}(element).parents("tr");
+	var id = row.data("id");
+	
+	popupConfirm( MSG_DEL_CONFIRM, function(result) {
+		if (result) {
+			var url = "${nameLC}/delete";
+			var condition = {
+				"id" : id
+			}
+			ajaxSubmit(url, condition, event);
+		}
+	});
+}
+
+function detailItem(element, event) {
+	event.preventDefault();
+
+	// Prepare data
+	var row = $(element).parents("tr");
+	var id = row.data("id");
+	var url = BASE_URL + "${nameLC}/detail?id=" + id;
+
+	// Redirect to page detail
+	ajaxRedirect(url);
+}
+
+function doExportExcel(linkExport) {
+	doExportExcelWithToken(linkExport, "token", setConditionSearch());
+}
